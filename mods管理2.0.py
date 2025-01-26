@@ -15,7 +15,6 @@ destination_directory_entry = None
 source_listbox = None
 destination_listbox = None
 mod_count_label = None
-mod_size_label = None  # 新增变量用于显示mods占用的内存大小
 id_map = {}
 destination_mods_info = {}
 
@@ -51,7 +50,7 @@ def find_creative_workshop_id(mod_name, source_directory):
 
 def generate_mods_info(source_directory, destination_directory):
     """
-    生成Mods_info.json文件
+    生成mods_info.json文件
     :param source_directory: 源目录（包含Mods文件夹的目录）
     :param destination_directory: 目标目录（包含Mods文件夹的目录）
     """
@@ -76,6 +75,7 @@ def generate_mods_info(source_directory, destination_directory):
     with open(json_path, 'w', encoding='utf-8') as file:
         json.dump(mods_info, file, ensure_ascii=False, indent=4)
     messagebox.showinfo("完成", "mods_info.json文件已生成。")
+
 def copy_mods(source_directory, destination_directory, selected_mods):
     """
     复制选定的Mods文件夹内的Mods到另一个目录，并更新mods_info.json
@@ -117,6 +117,8 @@ def move_or_copy_mods(source_directory, destination_directory, selected_mods, ac
     progress["maximum"] = len(selected_mods)
     progress["value"] = 0
 
+    # 设定一个虚假的进度
+    fake_max_value = 0.9 * len(selected_mods)
     for mod in selected_mods:
         mod_item_path = os.path.join(source_directory, id_map[mod], "mods", mod)
         if os.path.exists(mod_item_path):
@@ -135,8 +137,13 @@ def move_or_copy_mods(source_directory, destination_directory, selected_mods, ac
             mods_info["mods"][mod] = workshop_id
 
             # 更新进度条
-            progress["value"] += 1
+            if progress["value"] < fake_max_value:
+                progress["value"] += 1
             root.update()
+
+    # 更新进度条到100%
+    progress["value"] = len(selected_mods)
+    root.update()
 
     # 更新mods_info中的mods_count
     mods_info["mods_count"] = len(mods_info["mods"])
@@ -147,20 +154,8 @@ def move_or_copy_mods(source_directory, destination_directory, selected_mods, ac
 
     progress.destroy()
     messagebox.showinfo("完成", f"选定的Mods{action}完成，并更新了mods_info.json。")
-
-
-def calculate_directory_size(directory):
-    """
-    计算目录的总大小（单位：MB）
-    :param directory: 目录路径
-    :return: 目录总大小，单位为MB
-    """
-    total_size = 0
-    for dirpath, dirnames, filenames in os.walk(directory):
-        for f in filenames:
-            fp = os.path.join(dirpath, f)
-            total_size += os.path.getsize(fp)
-    return total_size / (1024 * 1024)
+    # 刷新目标目录的列表
+    load_destination_mods(destination_directory)
 
 def select_source_directory():
     directory = filedialog.askdirectory()
@@ -169,32 +164,8 @@ def select_source_directory():
         source_directory_entry.insert(0, directory)
         source_listbox.delete(0, tk.END)
         mod_count_label.config(text="Mods总数：0")
-        mod_size_label.config(text="Mods总大小：未计算")  # 修改默认显示为“未计算”
-        id_map.clear()  # 清除之前存储的ID映射
         if directory:
             load_mods(directory)
-
-def calculate_mod_sizes():
-    """
-    计算选定的Mods文件夹的总大小，并更新mods总大小标签
-    """
-    source_directory = source_directory_entry.get()
-    if not source_directory:
-        messagebox.showwarning("警告", "请选择源目录。")
-        return
-    
-    total_size = 0
-    for item in os.listdir(source_directory):
-        item_path = os.path.join(source_directory, item)
-        if os.path.isdir(item_path):
-            mod_folder_path = os.path.join(item_path, "mods")
-            if os.path.exists(mod_folder_path):
-                for mod in os.listdir(mod_folder_path):
-                    mod_item_path = os.path.join(mod_folder_path, mod)
-                    if os.path.isdir(mod_item_path) and mod in id_map:
-                        total_size += calculate_directory_size(mod_item_path)
-    
-    mod_size_label.config(text=f"Mods总大小：{total_size:.2f} MB")  # 更新mods大小显示
 
 def load_mods(source_directory):
     mods_list = set()
@@ -212,7 +183,6 @@ def load_mods(source_directory):
     for mod in mods_list:
         source_listbox.insert(tk.END, mod)
     mod_count_label.config(text=f"Mods总数：{len(mods_list)}")
-    mod_size_label.config(text="Mods总大小：未计算")  # 移除默认计算大小的逻辑
 
 def select_destination_directory():
     directory = filedialog.askdirectory()
@@ -403,6 +373,8 @@ def delete_mods():
         with open(json_path, 'w', encoding='utf-8') as file:
             json.dump(mods_info, file, ensure_ascii=False, indent=4)
     messagebox.showinfo("完成", "选定的Mods已删除，并更新了mods_info.json。")
+    # 刷新目标目录的列表
+    load_destination_mods(destination_directory)
 
 def move_mods_by_id(source_directory, destination_directory):
     """
@@ -424,6 +396,8 @@ def move_mods_by_id(source_directory, destination_directory):
     progress["maximum"] = len(id_map)
     progress["value"] = 0
 
+    # 设定一个虚假的进度
+    fake_max_value = 0.9 * len(id_map)
     for mod, workshop_id in id_map.items():
         mod_item_path = os.path.join(source_directory, workshop_id, "mods", mod)
         if os.path.exists(mod_item_path):
@@ -435,14 +409,21 @@ def move_mods_by_id(source_directory, destination_directory):
             print(f"已移动 {mod_item_path} 到 {destination_mod_path}")
 
             # 更新进度条
-            progress["value"] += 1
+            if progress["value"] < fake_max_value:
+                progress["value"] += 1
             root.update()
+
+    # 更新进度条到100%
+    progress["value"] = len(id_map)
+    root.update()
 
     progress.destroy()
     messagebox.showinfo("完成", "Mods已通过创意工坊ID移动完成。")
+    # 刷新目标目录的列表
+    load_destination_mods(destination_directory)
 
 def main():
-    global source_directory_entry, destination_directory_entry, source_listbox, destination_listbox, mod_count_label, mod_size_label, root
+    global source_directory_entry, destination_directory_entry, source_listbox, destination_listbox, mod_count_label, root
 
     # 创建主窗口
     root = tk.Tk()
@@ -491,6 +472,14 @@ def main():
 
     generate_info_button = tk.Button(button_frame_left, text="生成Mods_info.json", command=lambda: generate_mods_info(source_directory_entry.get(), destination_directory_entry.get()))
     generate_info_button.pack(side=tk.TOP, pady=5)
+    
+    #增加注释标签
+    # 左侧框架：注释标签
+    comment_label = tk.Label(left_frame, text="注：外部删除Mods会引发更新及显示问题，建议在软件内操作")
+    comment_label.pack(pady=5)
+    comment_label = tk.Label(left_frame, text="第一次打开软件建议选择完目录后点击生成Mods_info.json进行同步")
+    comment_label.pack(pady=5)
+    
 
     # 右侧框架：源Mods列表框
     source_listbox_label = tk.Label(right_frame, text="请选择需要复制或导出ID的源Mods：")
@@ -508,13 +497,9 @@ def main():
     mod_count_label = tk.Label(right_frame, text="Mods总数：0")
     mod_count_label.pack(pady=5)
 
-    # 右侧框架：Mods总大小标签
-    mod_size_label = tk.Label(right_frame, text="Mods总大小：未计算")  # 新增标签显示mods总大小，默认显示“未计算”
-    mod_size_label.pack(pady=5)
-
     # 右侧框架：操作按钮
     button_frame_right = tk.Frame(right_frame)
-    button_frame_right.pack(pady=20)
+    button_frame_right.pack(pady=10)
 
     select_all_button = tk.Button(button_frame_right, text="全选源Mods", command=select_all_mods)
     select_all_button.pack(side=tk.LEFT, padx=10)
@@ -525,11 +510,8 @@ def main():
     delete_button = tk.Button(button_frame_right, text="删除选定的目标Mods", command=delete_mods)
     delete_button.pack(side=tk.LEFT, padx=10)
 
-    calculate_sizes_button = tk.Button(button_frame_right, text="计算源Mods总大小", command=calculate_mod_sizes)
-    calculate_sizes_button.pack(side=tk.LEFT, padx=10)
-
-    display_mods_button = tk.Button(button_frame_right, text="显示目标目录中的Mods列表", command=select_destination_directory)
-    display_mods_button.pack(side=tk.LEFT, padx=10)
+    # display_mods_button = tk.Button(button_frame_right, text="显示目标目录中的Mods列表", command=select_destination_directory)
+    # display_mods_button.pack(side=tk.LEFT, padx=10)
 
     # 进入主循环
     root.mainloop()
