@@ -4,11 +4,6 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import json
 
-#作者: Nana
-#版本: 2.0
-#日期: 2024.1.26
-# 本项目基于MIT协议开源，任何人可以自由使用、修改、分发本项目的代码。
-
 # 定义全局变量
 source_directory_entry = None
 destination_directory_entry = None
@@ -18,7 +13,36 @@ mod_count_label = None
 id_map = {}
 destination_mods_info = {}
 
-#打包exe命令: pyinstaller --windowed -F --icon=icon.ppm mods管理2.0.py
+# 打包exe命令: pyinstaller --windowed -F --icon=icon.ppm mods管理2.0.py
+
+def create_log_window():
+    """
+    创建日志显示窗口
+    :return: 日志显示窗口的文本框和窗口本身
+    """
+    log_window = tk.Toplevel(root)
+    log_window.title("操作日志")
+    log_window.geometry("400x300")
+    log_text = tk.Text(log_window, width=50, height=10)
+    log_text.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
+    return log_text, log_window
+
+def update_log(text_widget, message):
+    """
+    更新日志窗口中的日志
+    :param text_widget: 日志文本框
+    :param message: 要添加的日志消息
+    """
+    text_widget.insert(tk.END, message + "\n")
+    text_widget.see(tk.END)  # 自动滚动到底部
+    root.update()
+
+def close_log_window(window):
+    """
+    关闭日志窗口
+    :param window: 日志窗口
+    """
+    window.destroy()
 
 def load_existing_mods(destination_directory):
     """
@@ -83,22 +107,23 @@ def copy_mods(source_directory, destination_directory, selected_mods):
     :param destination_directory: 目标目录（将Mods复制到的地方）
     :param selected_mods: 选定的Mods列表
     """
-    move_or_copy_mods(source_directory, destination_directory, selected_mods, action='copy')
+    log_text, log_window = create_log_window()
+    move_or_copy_mods(source_directory, destination_directory, selected_mods, action='copy', log_text=log_text)
+    close_log_window(log_window)
 
-def move_or_copy_mods(source_directory, destination_directory, selected_mods, action='copy'):
+def move_or_copy_mods(source_directory, destination_directory, selected_mods, action='copy', log_text=None):
     """
     复制或移动选定的Mods文件夹内的Mods到另一个目录，并更新mods_info.json
     :param source_directory: 源目录（包含Mods文件夹的目录）
     :param destination_directory: 目标目录（将Mods复制到的地方）
     :param selected_mods: 选定的Mods列表
     :param action: 动作，'copy' 或 'move'
+    :param log_text: 日志显示的文本框
     """
-    # 检查源目录是否存在
     if not os.path.exists(source_directory):
         messagebox.showerror("错误", "源目录不存在，请检查路径是否正确。")
         return
 
-    # 检查目标目录是否存在
     if not os.path.exists(destination_directory):
         # 目标目录不存在时创建它
         os.makedirs(destination_directory)
@@ -130,7 +155,10 @@ def move_or_copy_mods(source_directory, destination_directory, selected_mods, ac
                 shutil.copytree(mod_item_path, destination_mod_path)
             elif action == 'move':
                 shutil.move(mod_item_path, destination_mod_path)
-            print(f"已{action} {mod_item_path} 到 {destination_mod_path}")
+            message = f"已{action} {mod_item_path} 到 {destination_mod_path}"
+            if log_text:
+                update_log(log_text, message)
+            print(message)
 
             # 更新mods_info
             workshop_id = find_creative_workshop_id(mod, source_directory)
@@ -390,6 +418,8 @@ def move_mods_by_id(source_directory, destination_directory):
         messagebox.showerror("错误", "目标目录不存在，请检查路径是否正确。")
         return
 
+    log_text, log_window = create_log_window()
+
     # 创建进度条
     progress = ttk.Progressbar(root, orient="horizontal", length=300, mode="determinate")
     progress.pack(pady=10)
@@ -406,7 +436,10 @@ def move_mods_by_id(source_directory, destination_directory):
                 # 如果目标目录中已经存在同名文件，直接覆盖
                 shutil.rmtree(destination_mod_path)  # 删除已存在的目录
             shutil.move(mod_item_path, destination_mod_path)
-            print(f"已移动 {mod_item_path} 到 {destination_mod_path}")
+            message = f"已移动 {mod_item_path} 到 {destination_mod_path}"
+            if log_text:
+                update_log(log_text, message)
+            print(message)
 
             # 更新进度条
             if progress["value"] < fake_max_value:
@@ -419,6 +452,7 @@ def move_mods_by_id(source_directory, destination_directory):
 
     progress.destroy()
     messagebox.showinfo("完成", "Mods已通过创意工坊ID移动完成。")
+    close_log_window(log_window)
     # 刷新目标目录的列表
     load_destination_mods(destination_directory)
 
@@ -429,9 +463,9 @@ def main():
     root = tk.Tk()
     root.title("ZDE ModManager")
     root.geometry("800x600")
+
     # 更改窗口图标
     root.iconphoto(True, tk.PhotoImage(file=r"d:\github\僵尸毁灭工程脚本\icon.ppm"))
-
 
     # 创建左侧框架
     left_frame = tk.Frame(root, width=350)
@@ -473,8 +507,7 @@ def main():
     generate_info_button = tk.Button(button_frame_left, text="生成Mods_info.json", command=lambda: generate_mods_info(source_directory_entry.get(), destination_directory_entry.get()))
     generate_info_button.pack(side=tk.TOP, pady=5)
     
-    #增加注释标签
-    # 左侧框架：注释标签
+    # 增加注释标签
     comment_label = tk.Label(left_frame, text="注：外部删除Mods会引发更新及显示问题，建议在软件内操作")
     comment_label.pack(pady=5)
     comment_label = tk.Label(left_frame, text="第一次打开软件建议选择完目录后点击生成Mods_info.json进行同步")
@@ -509,9 +542,6 @@ def main():
 
     delete_button = tk.Button(button_frame_right, text="删除选定的目标Mods", command=delete_mods)
     delete_button.pack(side=tk.LEFT, padx=10)
-
-    # display_mods_button = tk.Button(button_frame_right, text="显示目标目录中的Mods列表", command=select_destination_directory)
-    # display_mods_button.pack(side=tk.LEFT, padx=10)
 
     # 进入主循环
     root.mainloop()
