@@ -37,10 +37,4 @@ ZDE ModManager 是一款用于管理《僵尸毁灭工程》(Project Zomboid) Mo
 ## 开源许可
 本项目基于MIT协议开源，任何人可以自由使用、修改、分发本项目的代码。
 
-## 联系方式
-如果你有任何问题或建议，欢迎通过以下方式联系作者：
-- 邮箱：nana@example.com
-- GitHub：[Nana](https://github.com/nana)
-
-## 致谢
-感谢所有为《僵尸毁灭工程》(Project Zomboid)贡献Mod的开发者们！
+@2021 ZDE ModManager
