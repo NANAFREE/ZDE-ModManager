@@ -3,6 +3,7 @@ import shutil
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import json
+from PIL import Image, ImageTk, Image
 
 # 定义全局变量
 source_directory_entry = None
@@ -232,6 +233,47 @@ def load_destination_mods(destination_directory):
         for mod in destination_mods_info["mods"].keys():
             destination_listbox.insert(tk.END, mod)
 
+def show_cover_image(event, source_directory, destination_directory, listbox, id_map):
+    """
+    显示选定Mods的封面图片
+    :param event: 事件对象
+    :param source_directory: 源目录
+    :param destination_directory: 目标目录
+    :param listbox: 列表框对象
+    :param id_map: Mod与创意工坊ID的映射字典
+    """
+    selected_index = listbox.curselection()
+    if not selected_index:
+        return
+
+    mod_name = listbox.get(selected_index[0])
+    if listbox == source_listbox:
+        mod_directory = os.path.join(source_directory, id_map[mod_name], "mods", mod_name)
+    else:
+        mod_directory = os.path.join(destination_directory, mod_name)
+
+    # 查找文件夹中的所有png图片
+    png_files = [f for f in os.listdir(mod_directory) if f.lower().endswith('.png')]
+    if png_files:
+        cover_path = os.path.join(mod_directory, png_files[0])  # 使用找到的第一张png图片
+        try:
+            image = Image.open(cover_path)
+            image = image.resize((200, 200), Image.Resampling.LANCZOS)  # 使用新的重采样方法
+            photo = ImageTk.PhotoImage(image)
+            # 清除之前显示的图片
+            for widget in image_frame.winfo_children():
+                widget.destroy()
+            image_label = tk.Label(image_frame, image=photo)
+            image_label.image = photo  # 防止图片被垃圾回收
+            image_label.pack()
+            image_frame.pack()
+        except Exception as e:
+            print(f"图片无法打开: {e}")  # 调试信息
+            pass  # 如果图片无法打开，不做任何处理
+    else:
+        image_frame.forget()  # 如果没有找到png图片，隐藏图片显示框
+
+
 def start_copying():
     source_directory = source_directory_entry.get()
     destination_directory = destination_directory_entry.get()
@@ -457,12 +499,12 @@ def move_mods_by_id(source_directory, destination_directory):
     load_destination_mods(destination_directory)
 
 def main():
-    global source_directory_entry, destination_directory_entry, source_listbox, destination_listbox, mod_count_label, root
+    global source_directory_entry, destination_directory_entry, source_listbox, destination_listbox, mod_count_label, root, image_frame
 
     # 创建主窗口
     root = tk.Tk()
     root.title("ZDE ModManager")
-    root.geometry("800x600")
+    root.geometry("800x900")
 
     # 更改窗口图标
     root.iconphoto(True, tk.PhotoImage(file=r"d:\github\僵尸毁灭工程脚本\icon.ppm"))
@@ -474,6 +516,11 @@ def main():
     # 创建右侧框架
     right_frame = tk.Frame(root, width=450)
     right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, padx=10, pady=10)
+
+    # 右侧框架：图片显示框
+    image_frame = tk.Frame(right_frame, highlightbackground="black", highlightthickness=1)
+    image_frame.pack(pady=10)
+
 
     # 左侧框架：源目录选择
     source_directory_label = tk.Label(left_frame, text="源目录（steamapps/common/创意工坊）：")
@@ -517,14 +564,16 @@ def main():
     # 右侧框架：源Mods列表框
     source_listbox_label = tk.Label(right_frame, text="请选择需要复制或导出ID的源Mods：")
     source_listbox_label.pack(pady=5)
-    source_listbox = tk.Listbox(right_frame, selectmode=tk.MULTIPLE, width=50, height=10)
+    source_listbox = tk.Listbox(right_frame, selectmode=tk.BROWSE, width=50, height=10)
     source_listbox.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
+    source_listbox.bind('<<ListboxSelect>>', lambda event: show_cover_image(event, source_directory_entry.get(), destination_directory_entry.get(), source_listbox, id_map))
 
     # 右侧框架：目标Mods列表框
     destination_listbox_label = tk.Label(right_frame, text="目标目录中的Mods：")
     destination_listbox_label.pack(pady=5)
-    destination_listbox = tk.Listbox(right_frame, selectmode=tk.MULTIPLE, width=50, height=10)
+    destination_listbox = tk.Listbox(right_frame, selectmode=tk.BROWSE, width=50, height=10)
     destination_listbox.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
+    destination_listbox.bind('<<ListboxSelect>>', lambda event: show_cover_image(event, source_directory_entry.get(), destination_directory_entry.get(), destination_listbox, id_map))
 
     # 右侧框架：Mods总数标签
     mod_count_label = tk.Label(right_frame, text="Mods总数：0")
